@@ -1,0 +1,16 @@
+rules:
+  - id: review.sider.html.target-blank
+      pattern:
+        - 'target="_blank"'
+        - "target='_blank'"
+        - 'target: "_blank"'
+        - "target: '_blank'"
+      glob:
+        - "**/*.{slim,erb,html,jsx,tsx}"
+      message: |
+        Links to cross-origin destinations are unsafe
+        When using target="_blank" the new page can access your window object via window.opener.
+        If you have links to another origin, you should use rel="noopener"
+        See https://developers.google.com/web/tools/lighthouse/audits/noopener
+      fail:
+        - '<a href="..." target="_blank">...</a>'
