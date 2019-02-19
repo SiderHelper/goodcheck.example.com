@@ -1,16 +1,336 @@
 rules:
+  - id: com.sideci.js.localstorage
+    pattern:
+      token: localStorage
+    glob:
+      - "**/*.js"
+      - "**/*.jsx"
+      - "**/*.ts"
+      - "**/*.tsx"
+    message: |
+      `localStorage` を使うときには注意が必要です
+      Safariのプライベートブラウジングなどで `localStorage` にアクセスしたときに例外が発生したりします。
+      `localStorage` にアクセスするときには、例外が発生しても問題ないように、処理に工夫をしてください。
+    fail: |
+      localStorage.setItem('abyssinian.issuesDescription.closed', 'true');
+    justification:
+      - 例外処理がされている場合
+      - 管理画面などで、エンドユーザーがアクセスしない場合
+  - id: com.sideci.company-name
+    pattern:
+      regexp: 株式会社\s*Sider
+    message:
+      Sider株式会社は後株です。前株ではありません。
+    glob:
+      - "**/*.rb"
+      - "**/*.{js,jsx,ts,tsx}"
+      - "**/*.{yaml,yml}"
+      - "**/*.{erb,slim,html}"
+      - "**/*.md"
+    fail:
+      - 株式会社Sider
+      - 株式会社 Sider
+    pass:
+      - Sider株式会社
+  - id: com.sideci.npm.no-dev-dependencies
+    pattern: '"devDependencies"'
+    message:
+      devDependencies は使いません
+
+      私たちはwebpackを使ってアプリケーションを開発しており、ビルドの過程でインストールするモジュールをdevとproductionに区別する理由はありません。
+      自信をもって `npm install` しましょう。
+    glob:
+      - "**/package.json"
+    fail:
+      - |
+        "devDependencies": { ... }
+    pass:
+      - devDependencies
+      - |
+        "dependencies": { ... }
+  - id: com.sideci.ts.no-return-type
+    pattern: "ReturnType"
+    message:
+      陽に宣言されていない型を得るために ReturnType を使わないでください
+
+      陽に宣言されていないと言うことはプログラムから推論された型と言うことになり、後で見たときに読むのに苦労します。
+    justification:
+      - ReturnType で取得される型が、型名はないが { } 構文を使って宣言されている場合
+      - Genericsのために、具体的な型として書き下すことができない場合
+    glob:
+      - "**/*.ts"
+      - "**/*.tsx"
+    fail:
+      - type Props = ReturnType<typeof mapStateToProps>
+  - id: com.sideci.js.recommend-intl-with-explicit-locale
+    pattern:
+      - new Intl.Collator()
+      - new Intl.Collator(undefined
+      - new Intl.Collator([]
+      - new Intl.DateTimeFormat()
+      - new Intl.DateTimeFormat(undefined
+      - new Intl.DateTimeFormat([]
+      - new Intl.NumberFormat()
+      - new Intl.NumberFormat(undefined
+      - new Intl.NumberFormat([]
+      - new Intl.PluralRules()
+      - new Intl.PluralRules(undefined
+      - new Intl.PluralRules([]
+      - toLocaleString()
+      - toLocaleDateString()
+      - toLocaleTimeString()
+    glob:
+      - "**/*.js"
+      - "**/*.jsx"
+      - "**/*.ts"
+      - "**/*.tsx"
+    message: |
+      `Intl` APIや `toLocale***String()` メソッドで第1引数 `locales` が省略された場合、
+      「ランタイムのデフォルトローケル」が使用されます。
+      「ランタイムのデフォルトロケール」はユーザーの設定を反映しないことがあるので（ブラウザの実装依存）、
+      `navigator.languages` を明示的に指定しましょう。
+      See:
+        https://github.com/sideci/sideci/pull/2023
+        https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl
+        https://developer.mozilla.org/en-US/docs/Web/API/NavigatorLanguage/languages
+    fail:
+      - "new Intl.DateTimeFormat()"
+      - "new Intl.DateTimeFormat(undefined, { year: 'numeric' })"
+      - "new Intl.NumberFormat()"
+      - "new Intl.NumberFormat(undefined, { style: 'currency', currency: 'jpy' })"
+      - "date.toLocaleString()"
+    pass:
+      - "new Intl.DateTimeFormat(navigator.languages)"
+      - "new Intl.DateTimeFormat(navigator.languages, { year: 'numeric' })"
+      - "new Intl.NumberFormat(navigator.languages)"
+      - "new Intl.NumberFormat(navigator.languages, { style: 'currency', currency: 'jpy' })"
+      - "date.toLocaleString(navigator.languages)"
+  - id: com.sideci.ts.react-node
+    pattern:
+      - ReactChild
+      - ReactChildren
+      - token: "=> JSX.Element"
+    message: |
+      JSX を書いて欲しいときには、より一般的な ReactNode を使う方が良いかもしれません
+      JSX として書かれているリテラルの型は JSX.Element == React.ReactChild ですが、 ReactNode には false や undefined が含まれます。
+      JSX のリテラルを書いてほしいときには ReactNode にするのが良いでしょう。
+    justification:
+      - ReactNode ではなく ReactChild が必要な場合
+      - 変数や関数の型で、確実に JSX.Element を要求する場合
+    fail:
+      - "interface Props { readonly node: React.ReactChild }"
+      - "interface Props { readonly render: () => JSX.Element | undefined }"
+    pass:
+      - "interface Props { readonly node: React.ReactNode }"
+      - "interface Props { readonly render: () => React.ReactNode }"
+  - id: com.sideci.js.catch-rethrow
+    glob:
+      - "**/*.{js,jsx,ts,tsx}"
+    pattern:
+      token: "catch"
+    message: |
+      `try...catch` または `Promise.prototype.catch()` を使う場合は、捕捉した例外を再スローすることを検討してください。
+      再スローすると、グローバル例外ハンドラーが例外を捕捉し、Bugsnag などへの通知を行なってくれます。
+      例外を捕捉した後に、UIの更新のみを行なって Bugsnag などへの通知を怠った場合、
+      発生した例外情報が握りつぶされてしまい、バグの発見や障害調査に支障をきたす恐れがあります。
+    justification:
+      - "すでに Bugsnag などに例外を通知している場合"
+    fail:
+      - "try { ... } catch (err) { console.error(err) }"
+      - "fetch(url).then(...).catch(() => updateUI())"
+  - id: com.sideci.project_settings
+    pattern:
+      - プロジェクト設定
+      - regexp: Project\sSettings
+        case_sensitive: false
+    message: |
+      リポジトリの設定という意味で、プロジェクト設定(Project Settings)という単語を使わないでください。
+      リポジトリ設定、プロジェクト設定という2つの単語で表記ゆれが起きていたので、リポジトリの設定という意味を指す単語は
+      リポジトリ設定(Repository Settings)を使ってください。
+    fail:
+      - プロジェクト設定
+      - Project settings
+    pass:
+      - リポジトリ設定
+      - Repository Settings
   - id: review.sider.html.target-blank
-      pattern:
-        - 'target="_blank"'
-        - "target='_blank'"
-        - 'target: "_blank"'
-        - "target: '_blank'"
-      glob:
-        - "**/*.{slim,erb,html,jsx,tsx}"
-      message: |
-        Links to cross-origin destinations are unsafe
-        When using target="_blank" the new page can access your window object via window.opener.
-        If you have links to another origin, you should use rel="noopener"
-        See https://developers.google.com/web/tools/lighthouse/audits/noopener
-      fail:
-        - '<a href="..." target="_blank">...</a>'
+    pattern:
+      - 'target="_blank"'
+      - "target='_blank'"
+      - 'target: "_blank"'
+      - "target: '_blank'"
+    glob:
+      - "**/*.{slim,erb,html,jsx,tsx}"
+    message: |
+      `target="_blank"` を使うときは `rel="noopener"` を付けておくとよいです。
+      セキュリティにもパフォーマンスにも良い影響があります。
+      See https://qiita.com/memolog/items/9913b0067e4e6883ed17
+    fail:
+      - '<a href="..." target="_blank">...</a>'
+  - id: review.sider.github_url
+    pattern:
+      token: "Constants::GITHUB_ENDPOINT"
+    glob: "**/*.{rb,erb,slim,jb}"
+    message: "You may use `GitHubURLBuilder`"
+  - id: review.sider.consent
+    pattern:
+      - CONSENT_VERSION
+      - LATEST_CONSENT_VERSION
+    glob:
+      - "app/**/*.rb"
+      - "frontend/**/*.ts{,x}"
+    message: |
+      You have to update both CONSENT_VERSION and LATEST_CONSENT_VERSION
+      CONSENT_VERSION is defined in JSX.
+      LATEST_CONSENT_VERSION is defined in AR model.
+  - id: review.sider.sass.mixin.ellipsis
+    pattern: "text-overflow: ellipsis;"
+    glob: "**/*.scss"
+    message: "You may use `@include ellipsis;` mixin."
+  - id: review.sider.disallow_protocol_relative_url
+    pattern:
+      - regexp: '"//\w+'
+      - regexp: "'//\\w+"
+    glob: "app/views/**/*.{erb,slim}"
+    message: |
+      "The Protocol-relative URL" is now an anti-pattern. Use `https://` explicitly.
+      See https://www.paulirish.com/2010/the-protocol-relative-url/
+    fail:
+      - 'href="//github.com"'
+    pass:
+      - 'href="https://github.com"'
+  - id: review.sider.ts.avoid_initial_state_for_routing
+    pattern:
+      token: initialState
+    glob: "**/*.{ts,tsx}"
+    message: |
+      Try to use `buildReducer` defined in `routing/Helper.ts` to implement routing reducers
+      Defining `initialState` does not make much sense in reducers which handles routing actions.
+      They receive `PageLoad<Params>` action at first so that they can construct a state from the routing parameters.
+    justification:
+      - "It is not a reducer which is managed by router"
+    fail:
+      - |
+        const initialState = {
+          modal: undefined,
+          organizationId: 0
+        }
+  - id: review.sider.ts.any_cast
+    pattern:
+      token: "as any"
+    glob: "**/*.{ts,tsx}"
+    message: |
+      Please be careful when using `as any` cast. Because it may not ensure type-safety.
+    justification:
+      - When type-safety is not important. For example, when writing a generic function.
+      - When TypeScript compiler occurs a weird error. For example, https://github.com/sider/sideci/pull/3479#discussion_r233430494
+  - id: review.sider.ts.reducer_as_any
+    pattern:
+      token: "reducer as any"
+    glob: "**/*.{ts,tsx}"
+    message: |
+      If strange TypeScript compile errors are leading you to cast a reducer as `any`, make sure the reducer accepts at least one action with the signature `{ type: string }`.
+      See https://github.com/sider/sideci/pull/3479#discussion_r233430494 for some background.
+      This way we can avoid the `as any` cast, and keep the reducers type safe.
+    justification:
+      - |
+        It might not make sense for the reducer to accept such an action.
+        In this case, talk to other developers to decide whether a dangerous cast (`as any`) or an unused action interface (`{ type: 'NONE' }`) is better.
+  - id: review.sider.japanese.issue_translation
+    pattern:
+      - 問題
+      - 課題
+    glob: "config/locales/**/ja.yml"
+    message: 「Issue」は無理に日本語に翻訳せず、英語のまま使いましょう。
+    justification: 「Issue」の翻訳に該当しない場合。
+  - id: review.sider.db_migration_steps
+    pattern: "ActiveRecord::Schema.define"
+    glob: "db/schema.rb"
+    message: |
+      This PR changes the database schema. When doing a DB migration, please follow these steps:
+      1. Open a new PR that only includes the DB migration (probably `db/**/*.rb` files).
+      2. Add the `migration` label to the PR.
+      3. Merge the PR when CI passes.
+      4. Wait for Jenkins to deploy the new build.
+      5. Run the DB migration (`bundle exec rake db:migrate`) on Jenkins.
+      6. Copy the DB migration log from AWS CloudWatch Logs, and paste in a comment to the PR.
+      For example, see https://github.com/sider/sideci/pull/3326
+      See also these resources about why we should separate migrations:
+      * https://drive.google.com/file/d/1bgq8agaxYwzF5NlGUpsHyR2KZs_Kre9j/view
+      * https://medium.com/klaxit-techblog/zero-downtime-migrations-with-activerecord-47528abe5136
+  - id: review.sider.ts.react.anonymous_component
+    pattern:
+      regexp: 'export(\s+)default(\s*)\(.+:(\s*)Props\)(\s*)=>'
+      multiline: true
+    glob: "**/*.tsx"
+    message: |
+      Avoid using anonymous functions for React components. It becomes harder to debug.
+      For details, see belows:
+      * https://medium.com/@stevemao/do-not-use-anonymous-functions-to-construct-react-functional-components-c5408ec8f4c7
+      * https://github.com/yannickcr/eslint-plugin-react/blob/master/docs/rules/display-name.md
+    fail:
+      - 'export default ({name}: Props) => <div />'
+    pass:
+      - 'export default function Foo({name}: Props) { return <div /> }'
+      - 'export const Foo = ({name}: Props) => <div />'
+  - id: review.sider.css.good_text_color
+    pattern:
+      regexp: '\s(color:)\s*\$(?!.*(white;|black;|gray;|gray-pale-[68]0;|([\w-]+)-dark;)).*'
+    glob: '**/*.scss'
+    message: |
+      This color variable is not suitable for text color.
+      Suitable colors are below:
+      * `$white`
+      * `$black`
+      * `$gray`
+      * `$gray-pale-80`
+      * `$gray-pale-60`
+      * `$*-dark` (e.g. `$blue-dark`)
+      For more details, see `variables.scss`.
+    pass:
+      - ' color: $gray-pale-60;'
+      - ' color: $blue-dark;'
+    fail:
+      - ' color: $gray-pale-40;'
+      - ' color: $blue;'
+  - id: review.sider.ts.env_global_var
+    pattern:
+      - token: production
+      - token: staging
+      - token: onprem
+    glob: '**/*.{ts,tsx}'
+    message: "You may use the `window.sider__appEnv` variable."
+  - id: review.sider.css.encoded_svg_data_image
+    pattern: 'data:image/svg+xml;utf8,'
+    glob: '**/*.{css,scss}'
+    message: |
+      Use Base64 encoded URL for SVG data images.
+      With Webpack, `url-loader` can encode them automatically.
+      (e.g., `background-image: url("./foo.svg");`
+      Raw SVG data images may not work on Firefox. See https://stackoverflow.com/a/30733736
+  - id: review.sider.css.z-index
+    pattern:
+      regexp: '\s(z-index:)\s*(?!.*\$.*)'
+    glob: '**/*.{css,scss}'
+    message: |
+      z-indexを指定するときには変数を使ってください
+      それぞれのCSSファイルにz-indexを書くと、他の要素と被さった際にどちらが優先されるかわかりにくくなります。
+      app/assets/stylesheets/variables.scssにz-indexの一覧を書いて、ひと目でわかるようにしておきましょう。
+      最初からz-indexの値がリテラルで書かれていたとしても、良い機会なのでクローズせずに変数にしてください。
+    pass:
+      - ' z-index: $z-index-dropdown;'
+    fail:
+      - ' z-index: 10;'
+  - id: review.sider.ts.docs_utility
+    pattern: Constants.SIDER_DOCS_URL
+    glob: '**/*.{ts,tsx}'
+    message: |
+      Recommend `utils/docs` utility function instead of `Constants.SIDER_DOCS_URL`.
+      Perhaps the code will become shorter and readable.
+    fail:
+      - '`${Constants.SIDER_DOCS_URL}/foo/bar`'
+    pass:
+      - 'docs("foo/bar")'
+
+import:
+  - https://raw.githubusercontent.com/sider/goodcheck-rules/master/rules/typo.yml
