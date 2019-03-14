@@ -14,7 +14,22 @@ rules:
       
       See https://developers.google.com/web/tools/lighthouse/audits/noopener
     pass:
-      - '<a href="..." target: "_blank" rel="noopener">...</a>'
+      - 'target: "_blank" rel="noopener"'
     fail:
       - '<a href="..." target="_blank">...</a>'
-    
+  - id: com.sideci.company-name
+    pattern:
+      regexp: 株式会社\s*Sider
+    message:
+      Sider株式会社は後株です。前株ではありません。
+    glob:
+      - "**/*.rb"
+      - "**/*.{js,jsx,ts,tsx}"
+      - "**/*.{yaml,yml}"
+      - "**/*.{erb,slim,html}"
+      - "**/*.md"
+    fail:
+      - 株式会社Sider
+      - 株式会社 Sider
+    pass:
+      - Sider株式会社
