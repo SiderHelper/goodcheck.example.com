@@ -15,8 +15,6 @@ rules:
       See https://developers.google.com/web/tools/lighthouse/audits/noopener
     pass:
       - '<a href="..." rel="noopener" target="_blank">...</a>'
-      - '<a href="..." rel='noopener' target="_blank">...</a>'
       - '<a href="..." target="_blank" rel="noopener">...</a>'
-      - '<a href="..." target="_blank" rel='noopener'>...</a>'
     fail:
       - '<a href="..." target="_blank">...</a>'
